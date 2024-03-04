@@ -1,0 +1,127 @@
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+# Define form
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "titulo"
+$form.Size = New-Object System.Drawing.Size(400,400)  # Adjusted initial size
+$form.StartPosition = "CenterScreen"
+$form.MaximizeBox = $false
+$form.BackColor = [System.Drawing.Color]::White
+
+# Create TableLayoutPanel for organizing checkboxes
+$tablePanel = New-Object System.Windows.Forms.TableLayoutPanel
+$tablePanel.Dock = [System.Windows.Forms.DockStyle]::Fill
+$tablePanel.AutoScroll = $true
+$form.Controls.Add($tablePanel)
+
+# Column Titles
+$titles = "Completo", "Derivaciones", "Referencias"
+for ($i = 0; $i -lt $titles.Length; $i++) {
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = $titles[$i]
+    $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $tablePanel.Controls.Add($label, $i, 0)
+}
+
+# Unique tags for each checkbox
+$tags = @(
+    @("Buscar Verde", "green", "Referencias"),  
+    @("Buscar Rojo", "red", "Completo"),
+    @("Amarrillo", "yellow", "Derivaciones"),
+    @("Azul", "azul", "Referencias"),
+    @("A", "azul", "Completo")  ,
+    @("B", "azul", "Derivaciones")       
+)
+
+# Dictionary to track the row index for each column
+$columnIndexes = @{}
+for ($i = 0; $i -lt $titles.Length; $i++) {
+    $columnIndexes[$titles[$i]] = 1  # Initialize row index for each column
+}
+
+# Add Checkboxes
+foreach ($tag in $tags) {
+    $checkbox = New-Object System.Windows.Forms.CheckBox
+    $checkbox.Text = $tag[0]  # Assign text to display
+    $checkbox.Tag = $tag[1]   # Assign tag to checkbox tag property
+    $columnName = $tag[2]    # Assign column name for the checkbox
+    $columnIndex = [array]::IndexOf($titles, $columnName)  # Get the column index based on the column name
+    $rowIndex = $columnIndexes[$columnName]  # Get the current row index for the column
+    $tablePanel.Controls.Add($checkbox, $columnIndex, $rowIndex)  # Add the checkbox to the TableLayoutPanel
+    $columnIndexes[$columnName]++  # Increment the row index for the column
+    $checkbox.Add_CheckedChanged({
+        # Enable "Execute Tests" button if at least one checkbox is checked
+        $button.Enabled = $tablePanel.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] -and $_.Checked } | Select-Object -First 1
+    })
+}
+
+# Add radio buttons for environment selection
+$radioGroup = New-Object System.Windows.Forms.GroupBox
+$radioGroup.Text = "Ambiente"
+$radioGroup.Dock = [System.Windows.Forms.DockStyle]::Bottom
+
+$devRadioButton = New-Object System.Windows.Forms.RadioButton
+$devRadioButton.Text = "DEV"
+$devRadioButton.Checked = $true
+$devRadioButton.Dock = [System.Windows.Forms.DockStyle]::Left
+
+$qaRadioButton = New-Object System.Windows.Forms.RadioButton
+$qaRadioButton.Text = "QA"
+$qaRadioButton.Dock = [System.Windows.Forms.DockStyle]::Right
+
+$radioGroup.Controls.AddRange(@($devRadioButton, $qaRadioButton))
+$form.Controls.Add($radioGroup)
+
+# Add button to check all checkboxes
+$button_CheckAll = New-Object System.Windows.Forms.Button
+$button_CheckAll.Text = "Seleccionar todo (regression)"
+$button_CheckAll.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::None
+$button_CheckAll.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$button_CheckAll.Add_Click({
+    foreach ($checkbox in $tablePanel.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] }) {
+        $checkbox.Checked = $true
+    }
+})
+$form.Controls.Add($button_CheckAll)
+
+# Add button to uncheck all checkboxes
+$button_UncheckAll = New-Object System.Windows.Forms.Button
+$button_UncheckAll.Text = "Deseleccionar todo"
+$button_UncheckAll.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::None
+$button_UncheckAll.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$button_UncheckAll.Add_Click({
+    foreach ($checkbox in $tablePanel.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] }) {
+        $checkbox.Checked = $false
+    }
+})
+$form.Controls.Add($button_UncheckAll)
+
+# Add Execute Button
+$button = New-Object System.Windows.Forms.Button
+$button.Text = "Iniciar"
+$button.Anchor = [System.Windows.Forms.AnchorStyles]::Bottom -bor [System.Windows.Forms.AnchorStyles]::None
+$button.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$button.Enabled = $false
+
+$button.Add_Click({
+    $button.Enabled = $false
+    $selectedTags = @()
+    foreach ($checkbox in $tablePanel.Controls | Where-Object { $_ -is [System.Windows.Forms.CheckBox] -and $_.Checked }) {
+        $selectedTags += "@" + $checkbox.Tag  # Add the tag corresponding to the checked checkbox
+    }
+    $tagsArgument = "-Dcucumber.filter.tags=`"$($selectedTags -join ' or ')`"" 
+    
+    # Determine selected environment
+    $env = if ($devRadioButton.Checked) { "dev" } else { "qa" }
+    
+    # Concatenate environment to mvnCommand
+    $mvnCommand = "mvn install --% $tagsArgument -Denvironment=$env"
+     Invoke-Expression $mvnCommand
+   
+    $button.Enabled = $true
+})
+$form.Controls.Add($button)
+
+# Display Form
+$form.ShowDialog() | Out-Null
