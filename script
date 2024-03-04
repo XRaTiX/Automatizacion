@@ -7,6 +7,7 @@ $form.Text = "titulo"
 $form.Size = New-Object System.Drawing.Size(400,400)  # Adjusted initial size
 $form.StartPosition = "CenterScreen"
 $form.MaximizeBox = $false
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog  # Set form border style
 $form.BackColor = [System.Drawing.Color]::White
 
 # Create TableLayoutPanel for organizing checkboxes
