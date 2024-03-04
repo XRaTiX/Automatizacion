@@ -1,0 +1,18 @@
+# Define the command-line arguments used by ChromeDriver
+$chromeDriverArgs = "--user-data-dir=C:\\Users\\a\\Desktop\\test"
+
+# Get all running Chrome processes
+$chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+
+# Loop through each Chrome process
+foreach ($process in $chromeProcesses) {
+    # Get the command-line arguments of the Chrome process
+    $cmdArgs = (Get-CimInstance Win32_Process -Filter "ProcessId = $($process.Id)").CommandLine
+
+    # Check if the command-line arguments match those used by ChromeDriver
+    if ($cmdArgs -match $chromeDriverArgs) {
+        # Close the Chrome window spawned by ChromeDriver
+        $process | Stop-Process -Force
+        Write-Host "Closed Chrome window spawned by ChromeDriver"
+    }
+}
